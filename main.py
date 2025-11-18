@@ -45,25 +45,57 @@ async def home_post(request: Request, query: str = Form(...)):
     # Parse results for display
     results = []
     raw_json = None
+    formatted_response = ""
+    citations_list = []
+    
     if isinstance(search_result, dict):
-        raw_json = search_result
-        # Try to extract stylized results if present
-        # If assistant_response contains citations, parse them
-        # For demo, just show assistant_response as summary
+        import json, re
         summary = search_result.get("assistant_response", "")
-        # Try to extract citations from assistant_response (simple pattern)
-        import re, json
-        citations = []
-        # Example: Sources: [title](url)
-        sources = re.findall(r'\[(.*?)\]\((https?://[^)]+)\)', summary)
-        for title, url in sources:
-            citations.append({"title": title, "url": url, "summary": summary})
-        if citations:
-            results = citations
+        citations_list = search_result.get("citations", [])
+        
+        # Format the response with citation exponents (only for display)
+        formatted_response = summary
+        if citations_list:
+            # Replace Azure citation markers like 【3:0†source】 with clickable superscripts
+            # Pattern matches 【number:number†source】
+            citation_pattern = r'【(\d+):(\d+)†source】'
+            
+            # Build a map of citation markers to citation index
+            matches = re.findall(citation_pattern, formatted_response)
+            seen_citations = {}
+            citation_counter = 1
+            
+            for doc_id, ann_id in matches:
+                marker = f'【{doc_id}:{ann_id}†source】'
+                if marker not in seen_citations:
+                    seen_citations[marker] = citation_counter
+                    citation_counter += 1
+            
+            # Replace each citation marker with a superscript link
+            for marker, num in seen_citations.items():
+                if num <= len(citations_list):
+                    citation = citations_list[num - 1]
+                    replacement = f'<sup><a href="{citation["url"]}" target="_blank" class="citation-link">[{num}]</a></sup>'
+                    formatted_response = formatted_response.replace(marker, replacement)
+        
+        results = {
+            "summary": formatted_response,
+            "citations": citations_list
+        }
+        # Keep raw JSON exactly as returned from API
+        # Convert the raw_message object to a dict representation
+        raw_message = search_result.get("raw_message")
+        if raw_message:
+            # Try to convert Azure SDK object to dict
+            if hasattr(raw_message, 'as_dict'):
+                raw_json = json.dumps(raw_message.as_dict(), indent=2, default=str)
+            else:
+                # The raw_message is the actual message dict we want to display
+                raw_json = json.dumps(raw_message, indent=2, default=str)
         else:
-            # Fallback: just show summary with no link
-            results = [{"title": "Result", "url": "#", "summary": summary}]
-        raw_json = json.dumps(search_result, indent=2)
+            # Fallback to original search_result
+            raw_json = json.dumps(search_result, indent=2, default=str)
+    
     return templates.TemplateResponse("index.html", {"request": request, "results": results, "raw_json": raw_json, "query": query})
 
 
@@ -207,36 +239,49 @@ async def search(query: str = Query(..., description="Search query")):
             last_msg = next((m for m in reversed(messages_list) if m.role == "assistant"), None)
 
             assistant_text = ""
+            citations = []
             if last_msg and last_msg.content:
+                print(last_msg)
                 for item in last_msg.content:
                     if 'text' in item and 'value' in item['text'] and item['text']['value']:
                         assistant_text += item['text']['value'] + "\n"
-            # citations = []
-            # if last_msg and last_msg['content']:
-            #     for item in last_msg['content']:
-            #         if 'text' in item and 'value' in item['text'] and item['text']['value']:
-            #             assistant_text += item['text']['value'] + "\n"
 
-            #         # Collect citation annotations
-            #         if 'annotations' in item['text']:
-            #             for ann in item['text']['annotations']:
-            #                 if 'url_citation' in ann:
-            #                     citations.append({
-            #                         "title": ann['url_citation']['title'],
-            #                         "url": ann['url_citation']['url']
-            #         })
+                    # Collect citation annotations
+                    if 'text' in item and 'annotations' in item['text']:
+                        for ann in item['text']['annotations']:
+                            if 'url_citation' in ann:
+                                citations.append({
+                                    "title": ann['url_citation']['title'],
+                                    "url": ann['url_citation']['url']
+                                })
+            
+            # Debug: Print what we collected
+            print(f"Found {len(citations)} citations in annotations")
+            print(f"Citation markers in text: {assistant_text.count('†source')}")
 
             assistant_text = assistant_text.strip()
             if not assistant_text:
                 print("Assistant produced no factual content; may need longer wait or instructions tweak.")
 
+            # Convert last_msg to dict for JSON serialization
+            raw_message_dict = None
+            if last_msg:
+                if hasattr(last_msg, 'as_dict'):
+                    raw_message_dict = last_msg.as_dict()
+                elif hasattr(last_msg, '__dict__'):
+                    raw_message_dict = last_msg.__dict__
+                else:
+                    raw_message_dict = {"message": str(last_msg)}
+            
             return {
                 "query": query,
                 "agent_id": agent.id,
                 "thread_id": thread.id,
                 "run_id": getattr(run, "id", None),
                 "run_status": getattr(run, "status", None),
-                "assistant_response": assistant_text or None
+                "assistant_response": assistant_text or None,
+                "citations": citations,
+                "raw_message": raw_message_dict
             }
     except Exception as e:  
         print(f"An error occurred: {e}")

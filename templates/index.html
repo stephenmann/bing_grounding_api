@@ -14,7 +14,13 @@
         .results { margin-top: 24px; }
         .result { background: #e9f1fb; border-radius: 8px; margin-bottom: 18px; padding: 18px 22px; }
         .result-title { font-size: 1.15em; font-weight: bold; color: #0078d4; text-decoration: none; }
-        .result-summary { margin-top: 8px; color: #2d3b4f; }
+        .result-summary { margin-top: 8px; color: #2d3b4f; line-height: 1.6; }
+        .citation-link { color: #0078d4; text-decoration: none; font-weight: bold; margin: 0 2px; }
+        .citation-link:hover { text-decoration: underline; }
+        .citations-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid #cfd8dc; }
+        .citations-title { font-weight: bold; margin-bottom: 12px; color: #2d3b4f; }
+        .citation-item { margin-bottom: 8px; }
+        .citation-number { color: #0078d4; font-weight: bold; margin-right: 8px; }
         .json-area { background: #23272e; color: #e6e6e6; font-family: 'Fira Mono', 'Consolas', monospace; padding: 18px; border-radius: 8px; margin-top: 32px; overflow-x: auto; font-size: 0.98em; }
         .json-area pre { margin: 0; }
     </style>
@@ -27,16 +33,27 @@
             <button type="submit">Search</button>
         </form>
         {% if results %}
+        <h2>Search Results</h2>
+        <h3>Beautified Response</h3>
         <div class="results">
-            {% for result in results %}
             <div class="result">
-                <a class="result-title" href="{{ result.url }}" target="_blank">{{ result.title }}</a>
-                <div class="result-summary">{{ result.summary }}</div>
+                <div class="result-summary">{{ results.summary|safe }}</div>
+                {% if results.citations %}
+                <div class="citations-section">
+                    <div class="citations-title">Sources:</div>
+                    {% for citation in results.citations %}
+                    <div class="citation-item">
+                        <span class="citation-number">[{{ loop.index }}]</span>
+                        <a href="{{ citation.url }}" target="_blank" class="result-title">{{ citation.title }}</a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
-            {% endfor %}
         </div>
         {% endif %}
         {% if raw_json %}
+        <h3>Raw JSON Response</h3>
         <div class="json-area">
             <pre>{{ raw_json }}</pre>
         </div>
