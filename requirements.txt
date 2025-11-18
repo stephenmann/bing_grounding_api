@@ -1,2 +1,7 @@
 fastapi
 uvicorn[standard]
+jinja2
+python-dotenv
+azure-ai-projects
+azure-identity
+python-multipart

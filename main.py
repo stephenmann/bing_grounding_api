@@ -1,5 +1,9 @@
 from typing import Optional
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request, Form
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import time
 
@@ -17,6 +21,51 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Set up Jinja2 templates
+templates = Jinja2Templates(directory="templates")
+
+# Optionally allow CORS for local dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Home page: GET shows form, POST processes search
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request, "results": None, "raw_json": None, "query": ""})
+
+@app.post("/", response_class=HTMLResponse)
+async def home_post(request: Request, query: str = Form(...)):
+    # Call the search logic
+    search_result = await search(query)
+    # Parse results for display
+    results = []
+    raw_json = None
+    if isinstance(search_result, dict):
+        raw_json = search_result
+        # Try to extract stylized results if present
+        # If assistant_response contains citations, parse them
+        # For demo, just show assistant_response as summary
+        summary = search_result.get("assistant_response", "")
+        # Try to extract citations from assistant_response (simple pattern)
+        import re, json
+        citations = []
+        # Example: Sources: [title](url)
+        sources = re.findall(r'\[(.*?)\]\((https?://[^)]+)\)', summary)
+        for title, url in sources:
+            citations.append({"title": title, "url": url, "summary": summary})
+        if citations:
+            results = citations
+        else:
+            # Fallback: just show summary with no link
+            results = [{"title": "Result", "url": "#", "summary": summary}]
+        raw_json = json.dumps(search_result, indent=2)
+    return templates.TemplateResponse("index.html", {"request": request, "results": results, "raw_json": raw_json, "query": query})
+
 
 @app.get("/search", summary="Search Endpoint", description="Accepts a query string and returns search results.")
 async def search(query: str = Query(..., description="Search query")):
@@ -30,6 +79,7 @@ async def search(query: str = Query(..., description="Search query")):
     Returns:
         dict: A dictionary containing the search results.
     """ 
+    # This function is reused for both API and web form
     print("Starting the Bing Grounding AI agent setup process.")  
   
     # Step 0: Validate environment variables  
@@ -39,6 +89,7 @@ async def search(query: str = Query(..., description="Search query")):
     agent_name = os.environ.get("AGENT_NAME")
     agent_instructions = os.environ.get("AGENT_INSTRUCTIONS")
     agent_llm = os.environ.get("MODEL_DEPLOYMENT_NAME", 'gpt-4.1')
+    api_key = os.environ.get("AZURE_OPENAI_API_KEY")
 
     missing_vars = []
     if not project_conn_str:
@@ -52,9 +103,12 @@ async def search(query: str = Query(..., description="Search query")):
     print("Environment variables validated successfully.")
 
     try:
-        # Step 1: Initialize the AI Project Client with default credentials  
-        print("Step 1: Initializing Azure AI Project Client...")  
-        credential = DefaultAzureCredential()  
+        # Step 1: Initialize the AI Project Client with credentials
+        print("Step 1: Initializing Azure AI Project Client...")
+        
+        print("Using DefaultAzureCredential (Azure CLI, Managed Identity, etc.)...")
+        credential = DefaultAzureCredential()
+        
         project_client = AIProjectClient(  
             credential=credential,  
             endpoint=project_conn_str  

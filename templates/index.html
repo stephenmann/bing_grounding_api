@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bing Grounding Search</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f4f6fa; margin: 0; padding: 0; }
+        .container { max-width: 700px; margin: 40px auto; background: #fff; padding: 32px 40px 40px 40px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+        h1 { text-align: center; color: #2d3b4f; }
+        .search-box { display: flex; justify-content: center; margin-bottom: 32px; }
+        input[type="text"] { width: 80%; padding: 12px; font-size: 1.2em; border: 1px solid #cfd8dc; border-radius: 6px 0 0 6px; outline: none; }
+        button { padding: 12px 24px; font-size: 1.2em; background: #0078d4; color: #fff; border: none; border-radius: 0 6px 6px 0; cursor: pointer; }
+        button:hover { background: #005fa3; }
+        .results { margin-top: 24px; }
+        .result { background: #e9f1fb; border-radius: 8px; margin-bottom: 18px; padding: 18px 22px; }
+        .result-title { font-size: 1.15em; font-weight: bold; color: #0078d4; text-decoration: none; }
+        .result-summary { margin-top: 8px; color: #2d3b4f; }
+        .json-area { background: #23272e; color: #e6e6e6; font-family: 'Fira Mono', 'Consolas', monospace; padding: 18px; border-radius: 8px; margin-top: 32px; overflow-x: auto; font-size: 0.98em; }
+        .json-area pre { margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bing Grounding Search</h1>
+        <form class="search-box" method="post" action="/">
+            <input type="text" name="query" placeholder="Enter your search query..." required value="{{ query|default('') }}">
+            <button type="submit">Search</button>
+        </form>
+        {% if results %}
+        <div class="results">
+            {% for result in results %}
+            <div class="result">
+                <a class="result-title" href="{{ result.url }}" target="_blank">{{ result.title }}</a>
+                <div class="result-summary">{{ result.summary }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if raw_json %}
+        <div class="json-area">
+            <pre>{{ raw_json }}</pre>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
