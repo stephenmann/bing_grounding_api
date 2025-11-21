@@ -41,6 +41,7 @@
                 {% if results.citations %}
                 <div class="citations-section">
                     <div class="citations-title">Sources:</div>
+                    <div class="citation-item"><a href="https://www.bing.com/search?q={{ query }}" target="_blank" class="result-title">{{ query }}</a></div>
                     {% for citation in results.citations %}
                     <div class="citation-item">
                         <span class="citation-number">[{{ loop.index }}]</span>

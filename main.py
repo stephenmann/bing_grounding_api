@@ -198,19 +198,19 @@ async def search(query: str = Query(..., description="Search query")):
             print(f"User message ID: {user_message.id}")
 
             # Step 6: Run agent (simple wait)
-            run = project_client.agents.runs.create(thread_id=thread.id, agent_id=agent.id)
-            print(f"Initial run status: {run.status}")
+            run = project_client.agents.runs.create_and_process(thread_id=thread.id, agent_id=agent.id, tool_choice={"type": "bing_grounding"})
+            print(f"Run finished with status: {run.status}")
 
-            wait_seconds = 7  # Slightly longer to allow tool call
-            print(f"Waiting {wait_seconds}s for agent + Bing tool invocation...")
-            time.sleep(wait_seconds)
+            #wait_seconds = 7  # Slightly longer to allow tool call
+            #print(f"Waiting {wait_seconds}s for agent + Bing tool invocation...")
+            #time.sleep(wait_seconds)
 
             # Optional refresh
-            try:
-                run = project_client.agents.runs.get(thread_id=thread.id, run_id=run.id)
-                print(f"Run status after wait: {run.status}")
-            except Exception as e:
-                print(f"Run refresh failed: {e}")
+            # try:
+            #     run = project_client.agents.runs.get(thread_id=thread.id, run_id=run.id)
+            #     print(f"Run status after wait: {run.status}")
+            # except Exception as e:
+            #     print(f"Run refresh failed: {e}")
 
             if run.status == "failed":
                 return {
